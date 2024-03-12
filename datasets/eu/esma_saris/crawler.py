@@ -51,8 +51,8 @@ def crawl(context: Context) -> None:
             if row.get("issuer") is not None:
                 issuer = context.make("LegalEntity")
                 if len(issuer) == 20:
-                    issuer.add("leiCode", issuer)
                     issuer.id = "lei-" + issuer
+                    issuer.add("leiCode", issuer)
                 else:
                     issuer.id = context.make_id(row.pop("issuer"))
                 issuer.add("name", row.pop("issuerName"))

@@ -49,16 +49,13 @@ def merge_broken_lines(csv_in: str, csv_out: str) -> None:
                 break
     
     with open(csv_in, "r") as f_in, open(csv_out, "w") as f_out:
-        reader = csv.DictReader(f_in, fieldnames=headers)
-        writer = csv.DictWriter(f_out, fieldnames=headers)
-        writer.writeheader()
+        reader = csv.reader(f_in)
+        writer = None
         output_row = None
         first_row = True
         for idx, row in enumerate(reader):
-            if idx < header_rows:
-                continue
-            if row["Record creation date"] in {"Record", "creation", "date"}:
-                continue
+            if row[0].startswith("Record"):
+                headers = row 
             if row["Record creation date"] == "":
                 for k, v in row.items():
                     output_row[k] = f"{output_row[k]} {v}"

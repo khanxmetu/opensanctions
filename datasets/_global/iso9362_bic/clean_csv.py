@@ -31,6 +31,46 @@ def is_date(cell: Optional[str]) -> bool:
     return DATE_RE.match(cell) is not None
 
 
+def merge_broken_lines(csv_in: str, csv_out: str) -> None:
+    headers = None
+    with open(csv_in, "r") as f_in:
+        reader = csv.reader(f_in)
+        for row_idx, row in enumerate(reader):
+            if headers is None:
+                headers = row
+                continue
+            if headers[0] != "Record creation date":
+                if row_idx > 3:
+                    raise Exception("Could not construct header")
+                for idx, cell in enumerate(row):
+                    headers[idx] = f"{headers[idx]} {cell}"
+            else:
+                header_rows = row_idx
+                break
+    
+    with open(csv_in, "r") as f_in, open(csv_out, "w") as f_out:
+        reader = csv.DictReader(f_in, fieldnames=headers)
+        writer = csv.DictWriter(f_out, fieldnames=headers)
+        writer.writeheader()
+        output_row = None
+        first_row = True
+        for idx, row in enumerate(reader):
+            if idx < header_rows:
+                continue
+            if row["Record creation date"] in {"Record", "creation", "date"}:
+                continue
+            if row["Record creation date"] == "":
+                for k, v in row.items():
+                    output_row[k] = f"{output_row[k]} {v}"
+            else:
+                output_row = row
+                if not first_row:
+                    print(row)
+                    writer.writerow(output_row)
+            first_row = False
+        writer.writerow(output_row)
+            
+
 def clean_csv(csv_in: str, csv_out: str) -> None:
     with open(csv_in, "r") as f_in, open(csv_out, "w") as f_out:
         reader = csv.reader(f_in, dialect=csv.unix_dialect)
@@ -43,7 +83,7 @@ def clean_csv(csv_in: str, csv_out: str) -> None:
                 if headers is None:
                     headers = [norm_header(c) for c in row]
                     assert "BIC" in headers, headers
-                    assert "FullLegalName" in headers, headers
+                    assert "Full legal name" in headers, headers
                     assert "BrchCode" in headers, headers
                     headers.append("FullBIC")
                     writer = csv.DictWriter(f_out, headers, dialect=csv.unix_dialect)
@@ -94,5 +134,7 @@ def clean_csv(csv_in: str, csv_out: str) -> None:
 
 if __name__ == "__main__":
     csv_in = sys.argv[1]
-    csv_out = f"{csv_in}.clean.csv"
-    clean_csv(csv_in, csv_out)
+    merged_out = f"{csv_in}.clean.csv"
+    clean_out = f"{csv_in}.clean.csv"
+    merge_broken_lines(csv_in, merged_out)
+    clean_csv(merged_out, clean_out)

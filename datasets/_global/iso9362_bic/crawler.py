@@ -6,7 +6,7 @@ from zavod.shed.internal_data import fetch_internal_data
 
 
 def crawl(context: Context) -> None:
-    hash_ = "85bdc3c638d87cccc5d0679abb7649f05a269c4b"
+    hash_ = "3fed0992e33d528c7063a568e0832a5578433526"
     h.assert_url_hash(context, context.data_url, hash_)
 
     data_path = context.get_resource_path("source.csv")
@@ -16,6 +16,8 @@ def crawl(context: Context) -> None:
     with open(data_path, "r") as fh:
         reader = csv.DictReader(fh)
         for row in reader:
+            print(row)
+            return
             entity = context.make("Organization")
             bic = row.pop("BIC")
             if bic[4:6] == "UT":

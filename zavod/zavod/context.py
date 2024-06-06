@@ -173,8 +173,10 @@ class Context:
         self,
         name: str,
         url: str,
+        method: str = "GET",
         auth: Optional[Any] = None,
         headers: Optional[Any] = None,
+        data: Optional[Dict[str, str]] = None,
     ) -> Path:
         """Fetch a URL into a file located in the current run folder,
         if it does not exist."""
@@ -182,9 +184,11 @@ class Context:
             self.http,
             url,
             name,
+            method,
             data_path=dataset_data_path(self.dataset.name),
             auth=auth,
             headers=headers,
+            data=data,
         )
 
     def fetch_response(

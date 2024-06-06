@@ -1,12 +1,16 @@
 from datetime import datetime
-from normality import collapse_spaces, slugify
-from pantomime.types import CSV
+from zipfile import ZipFile
+from normality import collapse_spaces, slugify, stringify
+from openpyxl import load_workbook
+from pantomime.types import CSV, ZIP
 from typing import Dict, List, Tuple
 import csv
+from lxml import etree
 
 from zavod import helpers as h
 from zavod.context import Context
 from zavod.logic.pep import OccupancyStatus, backdate, categorise
+from zavod.shed.zyte_api import fetch_html
 
 # NUMERO DOCUMENTO
 # NOMBRE PEP
@@ -184,7 +188,86 @@ def parse_table(table) -> List[Dict[str, str | Dict[str, str]]]:
         yield {hdr: c for hdr, c in zip(headers, cells)}
 
 
+XPATH_REPORT_BTN = ".//button[contains(@onclick, 'generarReportePEPActivos')]"
+XPATH_CAPTCHA_TOKEN_IS_SET = ".//input[@id='captchatokenInformePEPActivos' and contains(@value, 'A')]"
+
+
+def unblock_validator(doc):
+    return len(doc.xpath(XPATH_CAPTCHA_TOKEN_IS_SET)) > 0
+
+
+ACTIONS = [
+    {
+        "action": "evaluate",
+        "source": """
+            grecaptcha.ready(function() {
+                grecaptcha.execute('6LePwpkbAAAAACD_ToI0l8b0Nvv0MO9uNUQgJT_x').then(function(token) {
+                    $('#captchatokenInformePEPActivos').val(token);
+                });
+            });
+        """,
+    },
+    # {
+    #     "action": "click",
+    #     "selector": {
+    #         "type": "xpath",
+    #         "value": XPATH_REPORT_BTN,
+    #     }
+    # },
+    {
+        "action": "waitForSelector",
+        "selector": {
+            "type": "xpath",
+            # Wait until captcha token input is set
+            "value": XPATH_CAPTCHA_TOKEN_IS_SET,
+        },
+    },
+]
+
+
+def excel_records(fh):
+    wb = load_workbook(filename=fh, read_only=True)
+    for sheet in wb.worksheets:
+        headers = None
+        for idx, row in enumerate(sheet.rows):
+            cells = [c.value for c in row]
+            if headers is None:
+                headers = [slugify(cell, "_") for cell in cells]
+                continue
+            record = {}
+            for header, value in zip(headers, cells):
+                if isinstance(value, datetime):
+                    value = value.date()
+                value = stringify(value)
+                if value is not None:
+                    record[header] = value
+            yield record
+
+
 def crawl(context: Context):
+    doc = fetch_html(
+        context,
+        "https://www.funcionpublica.gov.co/fdci/consultaCiudadana/consultaPEP",
+        unblock_validator,
+        ACTIONS,
+        javascript=True,
+    )
+    captcha_token = doc.xpath(XPATH_CAPTCHA_TOKEN_IS_SET)[0].get("value")
+    #print(captcha_token)
+    url = "https://www.funcionpublica.gov.co/fdci/consultaCiudadana/generarReportePEPActivos"
+    path = context.fetch_resource(
+        "pep_declarations.zip",
+        url=url,
+        method="POST",
+        data={"captchatoken": captcha_token},
+    )
+    context.export_resource(path, ZIP, title="PEP Declarations file")
+    with ZipFile(path) as zip_file:
+        with zip_file.open("DECLARACIONES_PEP.xlsx") as myfile:
+            for row in excel_records(myfile):
+                print(row)
+
+    return
     seen = set()
     path = context.fetch_resource("source.csv", context.data_url)
     context.export_resource(path, CSV, title=context.SOURCE_TITLE)

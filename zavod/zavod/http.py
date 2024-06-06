@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Optional, Tuple, Mapping, Union, List
+from typing import Any, Dict, Optional, Tuple, Mapping, Union, List
 from functools import partial
 from pathlib import Path
 from banal import hash_data
@@ -63,9 +63,11 @@ def fetch_file(
     session: Session,
     url: str,
     name: str,
+    method: str = "GET",
     data_path: Path = settings.DATA_PATH,
     auth: Optional[Any] = None,
     headers: Optional[Any] = None,
+    data: Optional[Dict[str, str]] = None,
 ) -> Path:
     """Fetch a (large) file via HTTP to the data path."""
     out_path = data_path.joinpath(name)
@@ -73,8 +75,15 @@ def fetch_file(
         return out_path
     log.info("Fetching file", url=url)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with session.get(url, auth=auth, headers=headers, stream=True) as res:
+    with session.request(method, url, auth=auth, headers=headers, stream=True, data=data) as res:
         res.raise_for_status()
+        # TODO: Sometimes the token doesn't validate, so we get a redirect instead of the file.
+        print(res.history)
+        if res.history:
+            print(res.history[0].text)
+            print(res.history[0].request.headers)
+            print(res.history[0].request.body)
+            print(res.history[0].request.method)
         with open(out_path, "wb") as fh:
             for chunk in res.iter_content(chunk_size=8192 * 10):
                 fh.write(chunk)

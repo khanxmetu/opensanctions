@@ -5,6 +5,8 @@ from followthemoney.types import registry
 from followthemoney.util import join_text
 
 from zavod.entity import Entity
+from zavod.store import View
+from zavod.context import Context
 from zavod.meta import get_catalog
 from zavod.exporters.common import Exporter
 
@@ -32,17 +34,21 @@ class SimpleCSVExporter(Exporter):
         "last_change",
     ]
 
-    def concat_values(self, values: Iterable[str]) -> str:
-        output = io.StringIO()
-        writer = csv.writer(
-            output,
+    def __init__(self, context: Context, view: View) -> None:
+        super().__init__(context, view)
+        self.buffer = io.StringIO()
+        self.line_writer = csv.writer(
+            self.buffer,
             dialect=csv.unix_dialect,
             delimiter=";",
             lineterminator="",
             quoting=csv.QUOTE_MINIMAL,
         )
-        writer.writerow(sorted(values))
-        return output.getvalue()
+
+    def concat_values(self, values: Iterable[str]) -> str:
+        n = self.line_writer.writerow(sorted(values))
+        self.buffer.seek(0)
+        return self.buffer.read(n)
 
     def sanction_text(self, sanction: Entity) -> str:
         value = join_text(

@@ -74,7 +74,9 @@ children:
   - kg_fiu_national
   - kz_afmrk_sanctions
   - lt_fiu_freezes
+  - lt_magnitsky_amendments
   - lv_fiu_sanctions
+  - lv_magnitsky_list
   - md_terror_sanctions
   - my_moha_sanctions
   - ng_nigsac_sanctions
